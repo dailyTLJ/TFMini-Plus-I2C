@@ -69,7 +69,7 @@
 */
 
 #include <TFMPI2C.h>       //  TFMini-Plus I2C library header
-#include <wirePort->h>          //  Arduino I2C/Two-Wire Library
+#include <Wire.h>          //  Arduino I2C/Two-Wire Library
 
 // Constructor/Destructor
 TFMPI2C::TFMPI2C(){
