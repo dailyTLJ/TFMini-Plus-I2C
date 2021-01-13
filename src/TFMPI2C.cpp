@@ -60,20 +60,42 @@
  * v1.4.1 - 22JUL20 - Fixed bug in sendCommand() checksum calculation
           - Changed two printf()s to Serial.print()s
 	        - Fixed printReply() to show data from 'reply' rather than 'frame'
- * v1.4.2 - 09AUG20- Added `true` parameter to `Wire.endTransmission()`
+ * v1.4.2 - 09AUG20- Added `true` parameter to `wirePort->endTransmission()`
              and added explicit I2C addrees to short getData()
              functions in TFMPI2C.cpp.
- * v1.4.3 - 21AUG20 - Deleted all 'Wire.endTransmission()` functions
-             after a 'Wire.requestFrom(true)' in TFMPI2C.cpp.
+ * v1.4.3 - 21AUG20 - Deleted all 'wirePort->endTransmission()` functions
+             after a 'wirePort->requestFrom(true)' in TFMPI2C.cpp.
  * v1.5.0 - 03SEP20 - Added recoverI2CBus() function to free locked I2C bus
 */
 
 #include <TFMPI2C.h>       //  TFMini-Plus I2C library header
-#include <Wire.h>          //  Arduino I2C/Two-Wire Library
+#include <wirePort->h>          //  Arduino I2C/Two-Wire Library
 
 // Constructor/Destructor
-TFMPI2C::TFMPI2C(){}
+TFMPI2C::TFMPI2C(){
+    wirePort = &Wire; // default
+}
 TFMPI2C::~TFMPI2C(){}
+
+// initialize I2C interface
+void TFMPI2C::beginI2C(){
+    wirePort->begin();
+}
+
+// select I2C interface
+// 0 = default, 1st I2C port
+// 1 = 2nd I2C port (only Arduino DUE) 
+void TFMPI2C::setI2CPort( uint8_t port ){
+    I2CPort = port;
+
+    if (I2CPort==1) {
+        wirePort = &Wire1;      // 2nd I2C port 
+    } else if (I2CPort==0) {
+        wirePort = &Wire;      // default, 1st I2C port 
+    }
+}
+
+
 
 // = = = = =  GET A FRAME OF DATA FROM THE DEVICE  = = = = = = = = = =
 //
@@ -94,17 +116,17 @@ bool TFMPI2C::getData( int16_t &dist, int16_t &flux, int16_t &temp, uint8_t addr
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // Request one data-frame from the slave device address
     // and close the I2C interface.
-    Wire.requestFrom( (int)addr, TFMP_FRAME_SIZE, true);
+    wirePort->requestFrom( (int)addr, TFMP_FRAME_SIZE, true);
 
     memset( frame, 0, sizeof( frame));     // Clear the data-frame buffer.
     for( uint8_t i = 0; i < TFMP_FRAME_SIZE; i++)
     {
-      if( Wire.peek() == -1)     // If there is no next byte...
+      if( wirePort->peek() == -1)     // If there is no next byte...
       {
         status = TFMP_I2CREAD;   // then set error...
         return false;            // and return "false."
       }
-      else frame[ i] = uint8_t( Wire.read());
+      else frame[ i] = uint8_t( wirePort->read());
     }
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -219,18 +241,18 @@ bool TFMPI2C::sendCommand( uint32_t cmnd, uint32_t param, uint8_t addr)
     // Step 2 - Send the command data array to the device
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // Begin transmission to the I2C slave device
-    Wire.beginTransmission( addr);
+    wirePort->beginTransmission( addr);
     // Queue command data array for transmission to the I2C device
-    if( Wire.write( cmndData, (size_t)cmndLen) != cmndLen)
+    if( wirePort->write( cmndData, (size_t)cmndLen) != cmndLen)
     {
         status = TFMP_I2CLENGTH;  // then set satus code...
-        Wire.write( 0);           // Put a zero in the xmit buffer.
-        Wire.endTransmission( true);   // Send and Close the I2C interface.
+        wirePort->write( 0);           // Put a zero in the xmit buffer.
+        wirePort->endTransmission( true);   // Send and Close the I2C interface.
         return false;             // and return "false."
     }
 
     // Transmit the bytes and a stop message to release the I2C bus.
-    if( Wire.endTransmission( true) != 0)  // If write error...
+    if( wirePort->endTransmission( true) != 0)  // If write error...
     {
         status = TFMP_I2CWRITE;       // then set satus code...
         return false;                 // and return "false."
@@ -253,12 +275,12 @@ bool TFMPI2C::sendCommand( uint32_t cmnd, uint32_t param, uint8_t addr)
 
     // Request reply data from the device and
     // close the I2C interface.
-    Wire.requestFrom( (int)addr, (int)replyLen, true);
+    wirePort->requestFrom( (int)addr, (int)replyLen, true);
 
     memset( reply, 0, sizeof( reply));   // Clear the reply data buffer.
     for( uint8_t i = 0; i < replyLen; i++)
     {
-      reply[ i] = (uint8_t)Wire.read();
+      reply[ i] = (uint8_t)wirePort->read();
     }
     
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -318,7 +340,7 @@ bool TFMPI2C::sendCommand( uint32_t cmnd, uint32_t param)
 // waiting for a transfer to finish.  This function bypasses the Wire
 // library and sends 8 phony clock cycles, a NAK, and a STOP signal to
 // the SDA and SCL pin numbers.  This flushes any I2C data transfer
-// that had been in progress.  It concludes by calling `Wire.begin()`.
+// that had been in progress.  It concludes by calling `wirePort->begin()`.
 //
 void TFMPI2C::recoverI2CBus( uint8_t dataPin, uint8_t clockPin)
 {
@@ -353,8 +375,8 @@ void TFMPI2C::recoverI2CBus( uint8_t dataPin, uint8_t clockPin)
     pinMode( clockPin, INPUT);
     delay( 2000);
     
-   // Wire.pins( dataPin, clockPin);
-    Wire.begin();
+   // wirePort->pins( dataPin, clockPin);
+    wirePort->begin();
 }
 
 void thisTest(){};

@@ -72,6 +72,7 @@
 #define TFMPI2C_H
 
 #include <Arduino.h>    // Always include this. It's important.
+#include <Wire.h>
 
 #define TFMP_DEFAULT_ADDRESS   0x10   // default I2C slave address
                                       // as hexidecimal integer
@@ -200,6 +201,14 @@ class TFMPI2C
     uint8_t status;        // system error status: READY = 0
     uint8_t format;        // distance data format: CENTI or MILLI
     char scale;            // temperature scale: FAREN or CELSI
+
+
+    uint8_t I2CPort;       // 0 = default I2C Port, 1 = 2nd port Wire1
+    TwoWire *wirePort;
+
+    // initialize two-wire interface
+    void beginI2C();
+    void setI2CPort( uint8_t port );
 
     // Get device data-frame and pass back three values
     // using explicit I2C address
